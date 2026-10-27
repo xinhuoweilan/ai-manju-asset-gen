@@ -111,6 +111,40 @@ def main():
     else:
         line(WARN, "平台连通", "已跳过（--no-net 或缺少地址/令牌）")
 
+    # ⑦ 项目 / 画布权限（新人最常卡这里：账号能登录，但没被加进项目）
+    if not a.no_net and CFG.platform_base_url and CFG.token and CFG.project_id:
+        try:
+            import requests
+            h = {
+                "authorization": "Bearer " + CFG.token,
+                "content-type": "application/json",
+                "areainterface": "cn",
+                "origin": CFG.platform_base_url,
+                "referer": CFG.platform_base_url + "/",
+            }
+            r = requests.post(CFG.platform_base_url.rstrip("/") + "/api/Canvas/GetList",
+                              headers=h, json={"projectId": CFG.project_id}, timeout=20)
+            j = r.json()
+            if j.get("isSuccess"):
+                items = j.get("data") or []
+                if not isinstance(items, list):
+                    items = items.get("list") or []
+                ids = {str(x.get("id")) for x in items}
+                if not CFG.canvas_id:
+                    line(WARN, "项目 / 画布权限", f"项目可访问（{len(items)} 块画布），但未配置 CANVAS_ID")
+                elif str(CFG.canvas_id) in ids:
+                    line(OK, "项目 / 画布权限", f"项目可访问，画布 {CFG.canvas_id} 在列表里（共 {len(items)} 块）")
+                else:
+                    line(ERR, "项目 / 画布权限",
+                         f"项目可访问，但画布 {CFG.canvas_id} 不在其中（现有 {len(items)} 块）—— 检查 CANVAS_ID")
+            else:
+                line(ERR, "项目 / 画布权限",
+                     f"code={j.get('code')} {j.get('message')} —— 当前账号可能没被加进项目 {CFG.project_id}，或项目 ID 不对")
+        except Exception as e:
+            line(WARN, "项目 / 画布权限", f"检查失败：{type(e).__name__}: {e}")
+    else:
+        line(WARN, "项目 / 画布权限", "已跳过（--no-net 或缺少项目 ID）")
+
     print("=" * 70)
     if fails == 0:
         print(f"{OK} 全部通过，可以开工。")

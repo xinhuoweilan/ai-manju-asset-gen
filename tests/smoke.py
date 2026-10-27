@@ -138,6 +138,56 @@ def check_secrets():
         print("    ✓ 未发现敏感信息")
 
 
+def check_deps():
+    """AST 扫**所有** import（含函数体内的），验证每个模块都真的能找到。
+
+    这项是为了防「函数内 import 的本地模块被漏打包」——那种缺件 `--help` 抓不到，
+    要跑到具体功能才炸（实测吃过 5 次）。
+    """
+    print("[5/5] 依赖完整性（含函数内 import）")
+    import ast
+    import importlib.util
+
+    have = {p.stem for p in SCRIPTS.rglob("*.py")}
+    stdlib = set(getattr(sys, "stdlib_module_names", set()))
+    problems = []
+
+    for p in SCRIPTS.rglob("*.py"):
+        try:
+            tree = ast.parse(p.read_text(encoding="utf-8", errors="ignore"))
+        except SyntaxError:
+            continue
+        mods = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    mods.add(a.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                mods.add(node.module.split(".")[0])
+        for m in sorted(mods):
+            if m in have or m in stdlib:
+                continue
+            try:
+                if importlib.util.find_spec(m):
+                    continue
+            except (ImportError, ValueError, ModuleNotFoundError):
+                pass
+            problems.append((p.relative_to(SCRIPTS), m))
+
+    if problems:
+        seen = set()
+        for f, m in problems:
+            if m in seen:
+                continue
+            seen.add(m)
+            print(f"    ✗ {f} 需要 {m}（仓库里没有，也没装）")
+            FAILS.append((f"缺依赖 {m}", str(f)))
+        if not seen:
+            print("    ✓ 全部可解析")
+    else:
+        print("    ✓ 所有 import 都能解析")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="只跑语法 + 导入")
@@ -152,6 +202,7 @@ def main():
     if not a.quick:
         check_selfcheck()
         check_secrets()
+        check_deps()
 
     print("=" * 66)
     if FAILS:
