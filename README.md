@@ -91,8 +91,28 @@ ai-manju-asset-gen/
    │  ├─ scene_revise.py    按批注定向重出
    │  ├─ scene_frontface.py docx 提示词读取
    │  └─ costume_plan.py    换装规划
-   └─ src/                  提示词模型调用与文档解析
+   ├─ src/                  提示词模型调用与文档解析
+├─ tests/
+│  └─ smoke.py             冒烟测试（语法 / 导入 / 配置自检 / 敏感信息扫描）
+└─ .github/workflows/
+   └─ ci.yml               每次推送自动在 Windows + Ubuntu 上跑冒烟测试
 ```
+
+---
+
+## 本地自测（改完代码先跑这个）
+
+```bash
+python tests/smoke.py          # 全套：语法 / 每个脚本可导入 / 配置自检 / 敏感信息扫描
+python tests/smoke.py --quick  # 只跑语法 + 导入（更快）
+```
+
+它不联网、不花钱，也不需要真实的 `.env`（脚本自己注入一套假配置），只验证两件事：
+
+1. **代码能跑起来** —— 每个 CLI 脚本 `--help` 能出帮助、每个库文件能正常 import
+2. **缺配置时提示是对的** —— 不给配置必须是「友好提示」，不能是 Traceback
+
+推送后 GitHub Actions 会在 `windows-latest` 和 `ubuntu-latest` 上各跑一遍（Ubuntu 失败不阻断，只作跨平台参考）。
 
 ---
 
