@@ -42,6 +42,21 @@ def get(key: str, default: str = "") -> str:
     return os.environ.get(key) or _ENV.get(key) or default
 
 
+def _safe_home() -> pathlib.Path:
+    """取用户主目录，**任何环境都不抛异常**（CI / 容器 / 服务账户常常没有 HOME）。"""
+    for k in ("USERPROFILE", "HOME"):
+        v = os.environ.get(k)
+        if v and os.path.isdir(v):
+            return pathlib.Path(v)
+    try:
+        return pathlib.Path.home()
+    except Exception:
+        return pathlib.Path(os.environ.get("TEMP") or os.getcwd())
+
+
+_HOME = _safe_home()
+
+
 class _Config:
     # ---- 平台 ----
     platform_base_url: str = get("PLATFORM_BASE_URL")
@@ -50,7 +65,7 @@ class _Config:
     canvas_id: str = get("CANVAS_ID")
 
     # ---- 目录 ----
-    asset_root: pathlib.Path = pathlib.Path(get("ASSET_ROOT", str(pathlib.Path.home() / "AImanju")))
+    asset_root: pathlib.Path = pathlib.Path(get("ASSET_ROOT", str(_HOME / "AImanju")))
     work_dir: pathlib.Path = pathlib.Path(get("WORK_DIR", str(asset_root / "_work")))
     scripts_root: pathlib.Path = SCRIPTS_ROOT
     repo_root: pathlib.Path = REPO_ROOT
